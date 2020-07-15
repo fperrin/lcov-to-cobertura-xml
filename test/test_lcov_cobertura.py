@@ -5,21 +5,36 @@
 # This is free software, licensed under the Apache License, Version 2.0,
 # available in the accompanying LICENSE.txt file.
 
+import shutil
+import tempfile
 import unittest
 from xmldiff import main as xmldiff
 from xmldiff import actions
 
-from lcov_cobertura import LcovCobertura, Demangler
+from lcov_cobertura import LcovCobertura, main
 from distutils.spawn import find_executable
 
 
 class Test(unittest.TestCase):
     """Unit tests for lcov_cobertura."""
 
+    def setUp(self):
+        # Create a temporary directory
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        # Remove the directory after the test
+        shutil.rmtree(self.test_dir)
+
     def assertXmlEquals(self, left, right):
         xml_diff = xmldiff.diff_texts(left, right)
         # ignore MoveNode, order doesn't matter
         xml_diff = [x for x in xml_diff if not isinstance(x, actions.MoveNode)]
+
+        # ignore timestamps, only check that it's an integer
+        xml_diff = [x for x in xml_diff if not (isinstance(x, actions.UpdateAttrib) and
+                                                x.name == "timestamp" and
+                                                x.value.isdigit())]
 
         self.assertEqual(len(xml_diff), 0, xml_diff)
 
@@ -131,14 +146,28 @@ class Test(unittest.TestCase):
     @unittest.skipIf(find_executable("c++filt") is None,
                      "requires c++filt installed")
     def test_demangle(self):
-        converter = LcovCobertura(
-            "TN:\nSF:foo/foo.cpp\nFN:3,_ZN3Foo6answerEv\nFNDA:1,_ZN3Foo6answerEv\nFN:8,_ZN3Foo3sqrEi\nFNDA:1,_ZN3Foo3sqrEi\nDA:3,1\nDA:5,1\nDA:8,1\nDA:10,1\nend_of_record",
-            demangle=True)
-        TEST_TIMESTAMP = 1594850794
+        input_file = "{}/test_demangle.lcov".format(self.test_dir)
+        output_file = "{}/test_demangle.xml".format(self.test_dir)
+
+        with open(input_file, "w") as f:
+            f.write("""\
+TN:
+SF:foo/foo.cpp
+FN:3,_ZN3Foo6answerEv
+FNDA:1,_ZN3Foo6answerEv
+FN:8,_ZN3Foo3sqrEi
+FNDA:1,_ZN3Foo3sqrEi
+DA:3,1
+DA:5,1
+DA:8,1
+DA:10,1
+end_of_record""")
+        main(["test_lcov_cobertura.py", "--output", output_file, "--demangle", input_file])
+
         TEST_XML = r"""<?xml version="1.0" ?>
 <!DOCTYPE coverage
   SYSTEM 'http://cobertura.sourceforge.net/xml/coverage-04.dtd'>
-<coverage branch-rate="0.0" branches-covered="0" branches-valid="0" complexity="0" line-rate="1.0" lines-covered="4" lines-valid="4" timestamp="{}" version="2.0.3">
+<coverage branch-rate="0.0" branches-covered="0" branches-valid="0" complexity="0" line-rate="1.0" lines-covered="4" lines-valid="4" timestamp="1" version="2.0.3">
     <sources>
         <source>.</source>
     </sources>
@@ -169,9 +198,9 @@ class Test(unittest.TestCase):
         </package>
     </packages>
 </coverage>
-""".format(TEST_TIMESTAMP)
-        result = converter.parse(timestamp=TEST_TIMESTAMP)
-        xml = converter.generate_cobertura_xml(result, indent="    ")
+"""
+        with open(output_file, "r") as f:
+            xml = f.read()
         self.assertXmlEquals(xml, TEST_XML)
 
 if __name__ == '__main__':

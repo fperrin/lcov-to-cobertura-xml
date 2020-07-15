@@ -102,7 +102,7 @@ class LcovCobertura(object):
             'packages': {},
             'summary': {'lines-total': 0, 'lines-covered': 0,
                         'branches-total': 0, 'branches-covered': 0},
-            'timestamp': str(int(time.time()))
+            'timestamp': str(int(time.time())),
         }
         package = None
         current_file = None
