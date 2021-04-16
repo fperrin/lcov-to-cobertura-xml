@@ -203,5 +203,82 @@ end_of_record""")
             xml = f.read()
         self.assertXmlEquals(xml, TEST_XML)
 
+    @unittest.skipIf(find_executable("rustfilt") is None,
+                     "requires rustfilt installed")
+    def test_demangler_rustfilt(self):
+        input_file = "{}/test_demangler_rustfilt.lcov".format(self.test_dir)
+        output_file = "{}/test_demangler_rustfilt.xml".format(self.test_dir)
+        with open(input_file, "w") as f:
+            f.write("""\
+SF:src/main.rs
+FN:6,_RNvCsie3AuTHCqpB_10rust_hello4calc
+FN:2,_RNvCsie3AuTHCqpB_10rust_hello4main
+FNDA:1,_RNvCsie3AuTHCqpB_10rust_hello4calc
+FNDA:1,_RNvCsie3AuTHCqpB_10rust_hello4main
+FNF:2
+FNH:2
+DA:2,1
+DA:3,1
+DA:4,1
+DA:6,1
+DA:7,1
+DA:8,0
+DA:9,1
+DA:10,1
+DA:11,1
+DA:12,1
+BRF:0
+BFH:0
+LF:10
+LH:9
+end_of_record""")
+        main(["test_lcov_cobertura.py", "--output", output_file, "--demangler=rustfilt", input_file])
+
+        TEST_XML = """\
+<?xml version="1.0" ?>
+<!DOCTYPE coverage
+  SYSTEM 'http://cobertura.sourceforge.net/xml/coverage-04.dtd'>
+<coverage branch-rate="0.0" branches-covered="0" branches-valid="0" complexity="0" line-rate="0.9" lines-covered="9" lines-valid="10" timestamp="1620211505" version="2.0.3">
+        <sources>
+                <source>.</source>
+        </sources>
+        <packages>
+                <package branch-rate="0.0" complexity="0" line-rate="0.9" name="src">
+                        <classes>
+                                <class branch-rate="0.0" complexity="0" filename="src/main.rs" line-rate="0.9" name="src.main.rs">
+                                        <methods>
+                                                <method branch-rate="1.0" line-rate="1.0" name="rust_hello::calc" signature="">
+                                                        <lines>
+                                                                <line branch="false" hits="1" number="6"/>
+                                                        </lines>
+                                                </method>
+                                                <method branch-rate="1.0" line-rate="1.0" name="rust_hello::main" signature="">
+                                                        <lines>
+                                                                <line branch="false" hits="1" number="2"/>
+                                                        </lines>
+                                                </method>
+                                        </methods>
+                                        <lines>
+                                                <line branch="false" hits="1" number="2"/>
+                                                <line branch="false" hits="1" number="3"/>
+                                                <line branch="false" hits="1" number="4"/>
+                                                <line branch="false" hits="1" number="6"/>
+                                                <line branch="false" hits="1" number="7"/>
+                                                <line branch="false" hits="0" number="8"/>
+                                                <line branch="false" hits="1" number="9"/>
+                                                <line branch="false" hits="1" number="10"/>
+                                                <line branch="false" hits="1" number="11"/>
+                                                <line branch="false" hits="1" number="12"/>
+                                        </lines>
+                                </class>
+                        </classes>
+                </package>
+        </packages>
+</coverage>"""
+
+        with open(output_file, "r") as f:
+            xml = f.read()
+        self.assertXmlEquals(xml, TEST_XML)
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
