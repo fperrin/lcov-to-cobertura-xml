@@ -7,11 +7,21 @@
 
 import unittest
 from xmldiff import main as xmldiff
+from xmldiff import actions
 
-from lcov_cobertura import LcovCobertura
+from lcov_cobertura import LcovCobertura, Demangler
+from distutils.spawn import find_executable
+
 
 class Test(unittest.TestCase):
     """Unit tests for lcov_cobertura."""
+
+    def assertXmlEquals(self, left, right):
+        xml_diff = xmldiff.diff_texts(left, right)
+        # ignore MoveNode, order doesn't matter
+        xml_diff = [x for x in xml_diff if not isinstance(x, actions.MoveNode)]
+
+        self.assertEqual(len(xml_diff), 0, xml_diff)
 
     def test_parse(self):
         converter = LcovCobertura(
@@ -109,8 +119,7 @@ class Test(unittest.TestCase):
                                    'lines-covered': 1, 'lines-total': 2},
                        'timestamp': '1346815648000'}
         xml = converter.generate_cobertura_xml(parsed_lcov, indent="    ")
-        xml_diff = xmldiff.diff_texts(xml, TEST_XML)
-        self.assertEqual(len(xml_diff), 0)
+        self.assertXmlEquals(xml, TEST_XML)
 
     def test_treat_non_integer_line_execution_count_as_zero(self):
         converter = LcovCobertura(
@@ -119,6 +128,8 @@ class Test(unittest.TestCase):
         self.assertEqual(result['packages']['foo']['lines-covered'], 1)
         self.assertEqual(result['packages']['foo']['lines-total'], 2)
 
+    @unittest.skipIf(find_executable("c++filt") is None,
+                     "requires c++filt installed")
     def test_demangle(self):
         converter = LcovCobertura(
             "TN:\nSF:foo/foo.cpp\nFN:3,_ZN3Foo6answerEv\nFNDA:1,_ZN3Foo6answerEv\nFN:8,_ZN3Foo3sqrEi\nFNDA:1,_ZN3Foo3sqrEi\nDA:3,1\nDA:5,1\nDA:8,1\nDA:10,1\nend_of_record",
@@ -161,8 +172,7 @@ class Test(unittest.TestCase):
 """.format(TEST_TIMESTAMP)
         result = converter.parse(timestamp=TEST_TIMESTAMP)
         xml = converter.generate_cobertura_xml(result, indent="    ")
-        xml_diff = xmldiff.diff_texts(xml, TEST_XML)
-        self.assertEqual(len(xml_diff), 0)
+        self.assertXmlEquals(xml, TEST_XML)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
